@@ -61,7 +61,8 @@ class AIController {
 
             // Get fighter ID and profile name for personality-based AI
             const fighterId = fighter.id || 1;
-            const profileName = window.selectedFighterProfile || null;
+            // Use fighter's assigned profile if available, otherwise fall back to global
+            const profileName = fighter.assignedProfile || window.selectedFighterProfile || null;
 
             // Run inference on backend with profile support
             const result = await window.backend.runModelInference(observation, fighterId, profileName);
