@@ -1315,6 +1315,64 @@
             window.selectedFighterProfile = selectedProfile;
             window.selectedFighterIndex = fighterIndex;
 
+            // NEW: Apply fighter assignments and set up battle
+            let playerControlledFighter = null;
+
+            // Loop through all fighters and apply their profile assignments
+            GAME_STATE.fighters.forEach((fighter, index) => {
+                const dropdown = document.getElementById(`profile-select-${index}`);
+                const profile = dropdown ? dropdown.value : 'default';
+
+                // Store profile for each fighter
+                fighter.assignedProfile = profile;
+
+                // Check if this fighter should be player-controlled
+                if (profile === '' && !playerControlledFighter) {
+                    playerControlledFighter = fighter;
+                }
+            });
+
+            // Set up controlled fighter
+            if (playerControlledFighter) {
+                // Player controls this fighter
+                GAME_STATE.fighters.forEach(f => f.isControlled = false);
+                playerControlledFighter.isControlled = true;
+                GAME_STATE.controlled = playerControlledFighter;
+
+                document.getElementById('crowd').textContent =
+                    '🔥 ' + playerControlledFighter.name + ' IS PLAYER CONTROLLED!';
+
+                // Start backend episode for player-controlled fighter
+                if (window.backend && !GAME_STATE.episode_id) {
+                    const opponentIds = GAME_STATE.fighters
+                        .filter(f => f !== playerControlledFighter && !f.eliminated)
+                        .map((_, i) => i + 2);
+                    window.backend.startEpisode(1, opponentIds, RING_SIZE)
+                        .catch(err => console.log('Backend not available:', err));
+                }
+            } else {
+                // All fighters are AI-controlled
+                // Set selected fighter as observed (for camera to follow)
+                const observedFighter = GAME_STATE.fighters[fighterIndex];
+                if (observedFighter) {
+                    GAME_STATE.controlled = observedFighter;
+                    observedFighter.isControlled = false; // AI controlled, but camera follows
+
+                    document.getElementById('crowd').textContent =
+                        '🤖 WATCHING AI BATTLE: ' + observedFighter.name;
+                }
+            }
+
+            // Enable AI controller if any fighter has custom profile
+            const hasCustomProfiles = GAME_STATE.fighters.some(f =>
+                f.assignedProfile && f.assignedProfile !== '' && f.assignedProfile !== 'default'
+            );
+
+            if (hasCustomProfiles && window.aiController) {
+                window.aiController.enable();
+                console.log('🧠 Trained AI enabled for fighters with custom profiles');
+            }
+
             // Start the game
             document.getElementById('status-text').textContent = '🎬 ROUND 1: BEGIN!';
             updateFighterList();
