@@ -1,0 +1,144 @@
+############################################################
+# 3D Wrestling Arena / AI Training Platform - .gitignore
+# Tailored to mixed PHP + JS frontend and Python FastAPI RL backend.
+# Adjust as needed depending on what you want versioned.
+############################################################
+
+###############
+# OS cruft
+###############
+.DS_Store
+Thumbs.db
+
+###############
+# Python bytecode / build artifacts
+###############
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.eggs/
+build/
+dist/
+*.log
+*.prof
+*.tmp
+
+###############
+# Virtual environments (root or backend)
+###############
+venv/
+.env/
+.env
+.python-version
+
+###############
+# Dependency / packaging caches
+###############
+*.pyre/
+.mypy_cache/
+.pytest_cache/
+.pdm.toml
+.cache/
+
+###############
+# SQLite & other local databases (regenerated / mutable)
+###############
+*.db
+backend/data/databases/
+# If you want to keep migration scripts, commit them separately.
+
+###############
+# ML model checkpoints & weights (large, reproducible)
+###############
+backend/data/models/*.pth
+*.pth
+# If you want to ship a single exemplar model, remove it from ignore and commit that file explicitly.
+
+###############
+# Logs / telemetry / runtime outputs
+###############
+backend/data/logs/
+logs/
+*.log
+
+###############
+# Editor / tooling folders
+###############
+.vscode/
+.idea/
+.claude/
+
+###############
+# Temporary & scratch artifacts
+###############
+*.swp
+*.swo
+*.bak
+*.orig
+*.retry
+
+###############
+# Node / JS (none currently but future-proof)
+###############
+node_modules/
+*.tsbuildinfo
+
+###############
+# PHP session / cache files (uncommon here; add if used)
+###############
+# sess_*
+
+###############
+# Optional: Asset folders that may contain large binary GLB models
+# Uncomment to ignore all fighter models except a curated list.
+###############
+# Insert-GLBS/*.glb
+# !Insert-GLBS/README.md
+# Keep README to explain how to obtain models.
+
+###############
+# Security / secrets (add names if you introduce them)
+###############
+# backend/config.local.py
+# *.key
+# *.pem
+# .env.local
+# secrets.json
+
+###############
+# Misc tooling artifacts
+###############
+coverage/
+htmlcov/
+
+###############
+# Mac helper for Finder metadata (already covered above but explicit)
+###############
+.AppleDouble
+.LSOverride
+
+###############
+# Python packaging metadata (if created later)
+###############
+Pipfile.lock
+poetry.lock
+
+###############
+# Jupyter (if you add notebooks later)
+###############
+.ipynb_checkpoints/
+*.ipynb
+
+###############
+# Archive files
+###############
+*.zip
+*.tar
+*.gz
+*.bz2
+*.xz
+
+###############
+# End of file
+###############
