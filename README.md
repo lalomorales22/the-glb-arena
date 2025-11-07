@@ -101,7 +101,7 @@ The system automatically learns fighting strategies: positioning, targeting, ris
 
 ```bash
 # Terminal 1: Start the game (PHP)
-cd /Users/megabrain/Desktop/glb-arena
+cd /path/to/the-glb-arena
 php -S localhost:8000
 # Open http://localhost:8000 in browser
 
@@ -121,7 +121,7 @@ python example_training.py
 ### Option 1: Just Play the Game
 
 ```bash
-cd /Users/megabrain/Desktop/glb-arena
+cd /path/to/the-glb-arena
 php -S localhost:8000
 # Open http://localhost:8000
 # Play with keyboard controls (WASD + SPACE)
