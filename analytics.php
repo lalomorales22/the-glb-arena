@@ -519,22 +519,56 @@
         // ==================== FETCH DATA ====================
         async function fetchData() {
             try {
-                // Fetch fighters
-                const fightersRes = await fetch(`${API_URL}/fighters`);
-                fightersData = await fightersRes.json();
+                // Load GLB files dynamically from the Insert-GLBS folder
+                const glbRes = await fetch('list-glb-files.php');
+                const glbFiles = await glbRes.json();
 
-                // Fetch stats for each fighter
+                // Create fighter objects for each GLB file
+                fightersData = glbFiles.map((filepath, idx) => {
+                    const filename = filepath.split('/').pop();
+                    return {
+                        id: idx + 1,
+                        glb_filename: filename,
+                        model_version: 1
+                    };
+                });
+
+                // Fetch stats for each fighter from API (if available)
                 for (let fighter of fightersData) {
-                    const statsRes = await fetch(`${API_URL}/fighters/${fighter.id}/stats`);
-                    fighter.stats = await statsRes.json();
+                    try {
+                        const statsRes = await fetch(`${API_URL}/fighters/${fighter.id}/stats`);
+                        if (statsRes.ok) {
+                            fighter.stats = await statsRes.json();
 
-                    // Fetch episodes
-                    const episodesRes = await fetch(`${API_URL}/fighters/${fighter.id}/episodes`);
-                    fighter.episodes = await episodesRes.json();
+                            // Fetch episodes
+                            const episodesRes = await fetch(`${API_URL}/fighters/${fighter.id}/episodes`);
+                            fighter.episodes = episodesRes.ok ? await episodesRes.json() : [];
 
-                    // Fetch checkpoints
-                    const checkpointsRes = await fetch(`${API_URL}/fighters/${fighter.id}/checkpoints`);
-                    fighter.checkpoints = await checkpointsRes.json();
+                            // Fetch checkpoints
+                            const checkpointsRes = await fetch(`${API_URL}/fighters/${fighter.id}/checkpoints`);
+                            fighter.checkpoints = checkpointsRes.ok ? await checkpointsRes.json() : [];
+                        } else {
+                            // No data yet for this fighter (new GLB)
+                            fighter.stats = {
+                                total_episodes: 0,
+                                win_rate: 0,
+                                avg_reward: 0,
+                                avg_episode_length: 0
+                            };
+                            fighter.episodes = [];
+                            fighter.checkpoints = [];
+                        }
+                    } catch (error) {
+                        // Default stats if API is unavailable
+                        fighter.stats = {
+                            total_episodes: 0,
+                            win_rate: 0,
+                            avg_reward: 0,
+                            avg_episode_length: 0
+                        };
+                        fighter.episodes = [];
+                        fighter.checkpoints = [];
+                    }
                 }
             } catch (error) {
                 throw new Error(`Failed to fetch data: ${error.message}`);

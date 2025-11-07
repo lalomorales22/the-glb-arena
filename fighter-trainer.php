@@ -582,27 +582,33 @@
 
         async function loadFighters() {
             try {
-                const response = await fetch(`${API_BASE}/fighters`);
-                const fighters = await response.json();
+                // Load GLB files dynamically from the Insert-GLBS folder
+                const glbResponse = await fetch('list-glb-files.php');
+                const glbFiles = await glbResponse.json();
 
-                if (fighters.length === 0) {
-                    fighterSelection.innerHTML = '<p style="color: #ff6600;">No fighters available. Train some first!</p>';
+                if (glbFiles.length === 0) {
+                    fighterSelection.innerHTML = '<p style="color: #ff6600;">No GLB files found in Insert-GLBS folder!</p>';
                     return;
                 }
 
-                fighterSelection.innerHTML = fighters.map(fighter => `
-                    <label class="fighter-option">
-                        <input type="radio" name="fighter" value="${fighter.id}"
-                               onchange="selectFighter(${fighter.id}, '${fighter.glb_filename}')">
-                        <div>
-                            <div class="fighter-name">🥊 ${fighter.glb_filename.replace('.glb', '')}</div>
-                            <div class="fighter-info">ID: ${fighter.id} | Model v${fighter.model_version}</div>
-                        </div>
-                    </label>
-                `).join('');
+                // Convert GLB file paths to fighter options
+                fighterSelection.innerHTML = glbFiles.map((filepath, idx) => {
+                    const filename = filepath.split('/').pop();
+                    const fighterName = filename.replace('.glb', '');
+                    return `
+                        <label class="fighter-option">
+                            <input type="radio" name="fighter" value="${idx + 1}"
+                                   onchange="selectFighter(${idx + 1}, '${filename}')">
+                            <div>
+                                <div class="fighter-name">🥊 ${fighterName}</div>
+                                <div class="fighter-info">GLB: ${filename}</div>
+                            </div>
+                        </label>
+                    `;
+                }).join('');
             } catch (error) {
                 console.error('Failed to load fighters:', error);
-                fighterSelection.innerHTML = '<p style="color: #ff6600;">Failed to load fighters</p>';
+                fighterSelection.innerHTML = '<p style="color: #ff6600;">Failed to load GLB files from Insert-GLBS folder</p>';
             }
         }
 
