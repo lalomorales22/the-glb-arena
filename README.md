@@ -1,4 +1,4 @@
-# 3D Wrestling Arena - Championship Royale
+# 3D Wrestling Arena - GLB Arena RL 
 
 A complete **AI training system** where neural network agents learn to fight in an interactive 3D wrestling arena. Train your fighters using reinforcement learning (PPO), watch them improve through self-play, and deploy trained models back into the game. Powered by Three.js, PyTorch, and FastAPI.
 
@@ -969,11 +969,52 @@ Free to use and modify for portfolio and educational purposes.
 
 **Made with Three.js, JavaScript, PyTorch, and RL** 🎪🏆🧠
 
-*Last Updated: 2025-10-31 | Version 3.0 - Complete AI Learning Arena*
+*Last Updated: 2025-11-06 | Version 3.2 - Modal Selection & Battle Timing Fix*
 
 ### Version History
 
+- **v3.2** - ✨ Restored modal display on game start - player can now customize fighter personalities before battle! Fixed game starting too early by pausing game loop until START BATTLE clicked. Fixed FastAPI deprecation warnings.
+- **v3.1** - 🔧 Fixed: Resolved ReferenceError issues by making key functions globally accessible. API fixes for fighter profiles.
 - **v3.0** - ✅ COMPLETE: Full AI Learning System with PPO, neural networks, SQLite database, REST API, training pipeline
 - **v2.5** - Enhanced AI with random fighting attributes, improved arena lighting
 - **v2.0** - Dynamic GLB loading, square ring, realistic crowd, impact popups, knockout flight animations
 - **v1.0** - Initial release with basic 3D wrestling mechanics
+
+### Recent Fixes (v3.2)
+
+#### 🎮 Game Flow Improvements
+- ✅ **Modal displays without battle running** - Game loop paused until player clicks START BATTLE
+- ✅ **Default AI selected by default** - All fighters pre-selected with "Default AI" personality
+- ✅ **Personality selection functional** - Players can choose custom trained models or player control
+- ✅ **True modal experience** - No background battle logic interfering with selection screen
+
+#### 🐛 Backend Fixes
+- ✅ **Removed FastAPI deprecation warnings** - Migrated from `@app.on_event()` to modern `lifespan` context manager
+- ✅ **Cleaner startup output** - No more DeprecationWarning messages in console
+- ✅ **Future-proof code** - Uses current FastAPI best practices (v0.93+)
+
+#### 📝 What Changed
+
+**Frontend (index.php):**
+1. Changed `GAME_STATE.running` initialization from `true` to `false` (line 620)
+2. Added `GAME_STATE.running = true;` in `window.startAssignedBattle()` (line 600)
+3. Modified `initializeGame()` to call `showFighterAssignmentModal()` instead of auto-starting
+4. Updated `showFighterAssignmentModal()` to display the modal with `.show` class
+5. Set default selection to "🤖 Default AI" for all fighters
+6. Updated profile info display to show default AI selection styling
+
+**Backend (main.py):**
+1. Imported `asynccontextmanager` from contextlib
+2. Created `lifespan()` async context manager function
+3. Moved startup logic to pre-yield section
+4. Moved shutdown logic to post-yield section
+5. Passed `lifespan=lifespan` parameter to FastAPI app initialization
+
+#### How It Works Now
+
+1. Game initializes with `running = false`
+2. Animation loop runs but skips game logic (thanks to `if (GAME_STATE.running)` check)
+3. Modal displays for personality selection
+4. Player customizes fighters and clicks START BATTLE
+5. Button sets `GAME_STATE.running = true`
+6. Battle begins immediately

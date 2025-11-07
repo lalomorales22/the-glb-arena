@@ -284,6 +284,8 @@ def run_model_inference(fighter_id: int, data: dict, db: Session = Depends(get_d
         ).order_by(ModelCheckpoint.win_rate.desc()).first()
 
         if not best_model:
+            # No trained models available - this is normal for new games
+            logger.debug(f"No trained model available for fighter {fighter_id}, using scripted AI")
             raise HTTPException(status_code=404, detail="No trained model available")
 
         model_path = best_model.weights_path
@@ -298,6 +300,8 @@ def run_model_inference(fighter_id: int, data: dict, db: Session = Depends(get_d
 
         # Load the trained model
         if not os.path.exists(model_path):
+            # Model file doesn't exist - this is normal for new fighters
+            logger.debug(f"Model weights file not found: {model_path}, using scripted AI")
             raise HTTPException(status_code=404, detail=f"Model weights file not found: {model_path}")
 
         # Create agent and load weights
@@ -332,6 +336,9 @@ def run_model_inference(fighter_id: int, data: dict, db: Session = Depends(get_d
             "model_info": model_info,
         }
 
+    except HTTPException:
+        # Re-raise HTTP exceptions (404 for missing models, etc)
+        raise
     except Exception as e:
         import logging
         logging.error(f"Inference failed: {str(e)}")

@@ -4,6 +4,7 @@ Connects the game frontend with the RL training system.
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 import logging
 from datetime import datetime
 
@@ -17,11 +18,29 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app
+
+# Lifespan context manager for startup/shutdown events
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage app lifecycle: startup and shutdown events"""
+    # Startup
+    db_manager = get_db_manager()
+    db_manager.init_db()
+    logger.info("✅ Database initialized")
+
+    yield
+
+    # Shutdown
+    db_manager.close()
+    logger.info("Database connection closed")
+
+
+# Create FastAPI app with lifespan
 app = FastAPI(
     title="Wrestling Arena Backend",
     description="RL Training Backend for 3D Wrestling Arena Championship Royale",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # Add CORS middleware (allow requests from game frontend)
@@ -32,23 +51,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-# Initialize database on startup
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database on startup"""
-    db_manager = get_db_manager()
-    db_manager.init_db()
-    logger.info("✅ Database initialized")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown"""
-    db_manager = get_db_manager()
-    db_manager.close()
-    logger.info("Database connection closed")
 
 
 # Include API routes

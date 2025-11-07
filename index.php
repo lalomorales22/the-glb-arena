@@ -489,6 +489,23 @@
             }
         }
     </script>
+
+    <!-- Initialize GAME_STATE before all other scripts -->
+    <script>
+        // ==================== GLOBAL GAME STATE ====================
+        // Initialize early so it's available to ALL scripts
+        // Must use window.GAME_STATE for cross-script access
+        window.GAME_STATE = {
+            fighters: [],
+            controlled: null,
+            running: false,
+            victoryAnnounced: false,
+            episode_id: null,
+            frameCounter: 0,
+            lastFrameData: { health: 100, enemyCount: 0 }
+        };
+    </script>
+
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -497,27 +514,150 @@
         window.THREE = THREE;
         window.GLTFLoader = GLTFLoader;
 
-        // Start the game immediately
-        startGame();
+        // ==================== GLOBAL FUNCTIONS (Accessible to HTML event handlers) ====================
+
+        window.handleProfileSelection = function(fighterIndex, profileName) {
+            const infoDiv = document.getElementById(`profile-info-${fighterIndex}`);
+            if (!infoDiv) return;
+
+            if (profileName === '') {
+                infoDiv.textContent = '🎮 Player will control this fighter';
+                infoDiv.style.color = '#66ff00';
+            } else if (profileName === 'default') {
+                infoDiv.textContent = '🤖 Using default scripted AI';
+                infoDiv.style.color = '#ffaa00';
+            } else {
+                infoDiv.textContent = `📊 Custom personality: ${profileName}`;
+                infoDiv.style.color = '#ff5500';
+            }
+        };
+
+        window.startAssignedBattle = function() {
+            // Get modal and ensure GAME_STATE exists
+            const modal = document.getElementById('fighter-assignment-modal');
+            if (modal) {
+                modal.classList.remove('show');
+            }
+
+            // Ensure GAME_STATE is defined before proceeding
+            if (typeof GAME_STATE === 'undefined') {
+                console.error('GAME_STATE not initialized yet');
+                return;
+            }
+
+            // Get selected fighter profile
+            const fighterIndex = window.selectedFighterIndex || 0;
+            const selectElement = document.getElementById(`profile-select-${fighterIndex}`);
+            const selectedProfile = selectElement ? selectElement.value : 'default';
+
+            // Store profile assignment for later use
+            window.selectedFighterProfile = selectedProfile;
+            window.selectedFighterIndex = fighterIndex;
+
+            // Apply fighter assignments and set up battle
+            let playerControlledFighter = null;
+
+            // Loop through all fighters and apply their profile assignments
+            GAME_STATE.fighters.forEach((fighter, index) => {
+                const dropdown = document.getElementById(`profile-select-${index}`);
+                const profile = dropdown ? dropdown.value : 'default';
+
+                // Store profile for each fighter
+                fighter.assignedProfile = profile;
+
+                // Check if this fighter should be player-controlled
+                if (profile === '' && !playerControlledFighter) {
+                    playerControlledFighter = fighter;
+                }
+            });
+
+            // Set up controlled fighter
+            if (playerControlledFighter) {
+                // Player controls this fighter
+                GAME_STATE.fighters.forEach(f => f.isControlled = false);
+                playerControlledFighter.isControlled = true;
+                GAME_STATE.controlled = playerControlledFighter;
+
+                document.getElementById('crowd').textContent =
+                    '🔥 ' + playerControlledFighter.name + ' IS PLAYER CONTROLLED!';
+
+                // Start backend episode for player-controlled fighter
+                if (window.backend && !GAME_STATE.episode_id) {
+                    const RING_SIZE = 160; // Match the game config
+                    const opponentIds = GAME_STATE.fighters
+                        .filter(f => f !== playerControlledFighter && !f.eliminated)
+                        .map((_, i) => i + 2);
+                    window.backend.startEpisode(1, opponentIds, RING_SIZE)
+                        .catch(err => console.log('Backend not available:', err));
+                }
+            } else {
+                // All fighters are AI-controlled
+                // Set selected fighter as observed (for camera to follow)
+                const observedFighter = GAME_STATE.fighters[fighterIndex];
+                if (observedFighter) {
+                    GAME_STATE.controlled = observedFighter;
+                    observedFighter.isControlled = false; // AI controlled, but camera follows
+
+                    document.getElementById('crowd').textContent =
+                        '🤖 WATCHING AI BATTLE: ' + observedFighter.name;
+                }
+            }
+
+            // Enable AI controller for all AI-controlled fighters
+            const hasPlayerControl = GAME_STATE.fighters.some(f => !f.isControlled);
+            const needsAI = !playerControlledFighter; // All AI-controlled
+
+            if (needsAI && window.aiController) {
+                window.aiController.enable();
+                console.log('🤖 AI controller enabled for all fighters');
+            }
+
+            // Also check for custom profiles
+            const hasCustomProfiles = GAME_STATE.fighters.some(f =>
+                f.assignedProfile && f.assignedProfile !== '' && f.assignedProfile !== 'default'
+            );
+            if (hasCustomProfiles) {
+                console.log('⭐ Custom trained profiles detected');
+            }
+
+            // Start the game loop
+            GAME_STATE.running = true;
+            document.getElementById('status-text').textContent = '🎬 ROUND 1: BEGIN!';
+            window.updateFighterList();
+            window.updateFighterCount();
+        };
     </script>
     <script src="backend-integration.js"></script>
     <script src="AI_INTEGRATION.js"></script>
     <script>
+        // Reference GAME_STATE which was initialized earlier
+        const GAME_STATE = window.GAME_STATE;
+
+        // Wait for module script to load THREE and GLTFLoader
+        function waitForDependencies(callback, maxAttempts = 50) {
+            if (typeof window.THREE !== 'undefined' && typeof window.GLTFLoader !== 'undefined') {
+                callback();
+            } else if (maxAttempts > 0) {
+                setTimeout(() => waitForDependencies(callback, maxAttempts - 1), 100);
+            } else {
+                console.error('Failed to load THREE.js dependencies');
+            }
+        }
+
         function startGame() {
             // ==================== GAME CONFIG ====================
             const RING_SIZE = 160; // Square ring size (width and depth)
         const RING_MAT_HEIGHT = 2;
         const FIGHTER_GROUND_Y = RING_MAT_HEIGHT;
         const KNOCKOUT_DISTANCE = RING_SIZE / 1.2; // Diagonal distance for square
-        const GAME_STATE = {
-            fighters: [],
-            controlled: null,
-            running: true,
-            victoryAnnounced: false,
-            episode_id: null,
-            frameCounter: 0,
-            lastFrameData: { health: 100, enemyCount: 0 }
-        };
+        // GAME_STATE is now defined globally above, just reset it
+        GAME_STATE.fighters = [];
+        GAME_STATE.controlled = null;
+        GAME_STATE.running = false;
+        GAME_STATE.victoryAnnounced = false;
+        GAME_STATE.episode_id = null;
+        GAME_STATE.frameCounter = 0;
+        GAME_STATE.lastFrameData = { health: 100, enemyCount: 0 };
 
         // ==================== SCENE SETUP ====================
         const scene = new THREE.Scene();
@@ -945,23 +1085,26 @@
                 }
             }
 
-            async handleAIMovement() {
-                // Try to use trained model AI if available
+            handleAIMovement() {
+                // Try to use trained model AI if available (async, will update in background)
                 if (window.aiController && window.aiController.useTrainedModel) {
-                    const action = await window.aiController.getAction(
+                    // Trigger async AI in background, but don't block on it
+                    window.aiController.getAction(
                         this,
                         GAME_STATE.fighters,
                         RING_SIZE
-                    );
-
-                    if (action !== null) {
-                        // Use trained model action
-                        window.aiController.executeAction(this, action, GAME_STATE.fighters);
-                        return; // Skip scripted AI
-                    }
+                    ).then(action => {
+                        if (action !== null) {
+                            // Use trained model action when available
+                            window.aiController.executeAction(this, action, GAME_STATE.fighters);
+                        }
+                    }).catch(err => {
+                        // Silent fail, fall back to scripted
+                        console.log('AI inference error, using scripted AI');
+                    });
                 }
 
-                // Fall back to scripted AI
+                // Always run scripted AI as fallback (or as default)
                 this.ai.moveTimer -= 0.016;
 
                 if (this.ai.moveTimer <= 0) {
@@ -1044,8 +1187,8 @@
                     const message = aiMessages[Math.floor(Math.random() * aiMessages.length)];
                     document.getElementById('crowd').textContent = message;
 
-                    updateFighterList();
-                    updateFighterCount();
+                    window.updateFighterList();
+                    window.updateFighterCount();
                 }
             }
 
@@ -1117,7 +1260,7 @@
                 const direction = this.position.clone().normalize();
                 this.knockoutDirection.copy(direction);
 
-                updateFighterList();
+                window.updateFighterList();
             }
 
             knockBack(direction) {
@@ -1200,7 +1343,7 @@
 
         // ==================== GAME INITIALIZATION ====================
         function initializeGame() {
-            // Show fighter assignment modal
+            // Show the fighter assignment modal so player can choose personalities
             showFighterAssignmentModal();
         }
 
@@ -1209,6 +1352,11 @@
             const grid = document.getElementById('fightersGrid');
             const API_BASE = 'http://localhost:8001/api';
             const API_TIMEOUT = 5000;
+
+            // Show the modal
+            if (modal) {
+                modal.classList.add('show');
+            }
 
             grid.innerHTML = '';
 
@@ -1232,10 +1380,10 @@
                     <div class="fighter-card-model">Fighter ID: ${index + 1}</div>
                     <select class="profile-dropdown" id="profile-select-${index}" onchange="handleProfileSelection(${index}, this.value)">
                         <option value="">🚫 No AI (Player Controlled)</option>
-                        <option value="default">🤖 Default AI</option>
+                        <option value="default" selected>🤖 Default AI</option>
                         <optgroup label="Custom Personalities" id="personalities-${index}"></optgroup>
                     </select>
-                    <div class="profile-info" id="profile-info-${index}">Select a personality profile</div>
+                    <div class="profile-info" id="profile-info-${index}" style="color: #ffaa00;">🤖 Using default scripted AI</div>
                 `;
 
                 card.addEventListener('click', () => {
@@ -1252,9 +1400,15 @@
 
                 // Load profiles for this fighter asynchronously
                 fetch(`${API_BASE}/fighter-profiles/${index + 1}`, { timeout: API_TIMEOUT })
-                    .then(res => res.json())
+                    .then(res => {
+                        // Only try to parse JSON if response is OK
+                        if (!res.ok) {
+                            return []; // Return empty array for 404 or other errors
+                        }
+                        return res.json();
+                    })
                     .catch(err => {
-                        console.log(`No profiles found for fighter ${index + 1}:`, err);
+                        // Silently ignore errors (no profiles for this fighter)
                         return [];
                     })
                     .then(profiles => {
@@ -1302,84 +1456,7 @@
             btn.disabled = typeof window.selectedFighterIndex === 'undefined';
         }
 
-        function startAssignedBattle() {
-            const modal = document.getElementById('fighter-assignment-modal');
-            modal.classList.remove('show');
-
-            // Get selected fighter profile
-            const fighterIndex = window.selectedFighterIndex || 0;
-            const selectElement = document.getElementById(`profile-select-${fighterIndex}`);
-            const selectedProfile = selectElement ? selectElement.value : 'default';
-
-            // Store profile assignment for later use
-            window.selectedFighterProfile = selectedProfile;
-            window.selectedFighterIndex = fighterIndex;
-
-            // NEW: Apply fighter assignments and set up battle
-            let playerControlledFighter = null;
-
-            // Loop through all fighters and apply their profile assignments
-            GAME_STATE.fighters.forEach((fighter, index) => {
-                const dropdown = document.getElementById(`profile-select-${index}`);
-                const profile = dropdown ? dropdown.value : 'default';
-
-                // Store profile for each fighter
-                fighter.assignedProfile = profile;
-
-                // Check if this fighter should be player-controlled
-                if (profile === '' && !playerControlledFighter) {
-                    playerControlledFighter = fighter;
-                }
-            });
-
-            // Set up controlled fighter
-            if (playerControlledFighter) {
-                // Player controls this fighter
-                GAME_STATE.fighters.forEach(f => f.isControlled = false);
-                playerControlledFighter.isControlled = true;
-                GAME_STATE.controlled = playerControlledFighter;
-
-                document.getElementById('crowd').textContent =
-                    '🔥 ' + playerControlledFighter.name + ' IS PLAYER CONTROLLED!';
-
-                // Start backend episode for player-controlled fighter
-                if (window.backend && !GAME_STATE.episode_id) {
-                    const opponentIds = GAME_STATE.fighters
-                        .filter(f => f !== playerControlledFighter && !f.eliminated)
-                        .map((_, i) => i + 2);
-                    window.backend.startEpisode(1, opponentIds, RING_SIZE)
-                        .catch(err => console.log('Backend not available:', err));
-                }
-            } else {
-                // All fighters are AI-controlled
-                // Set selected fighter as observed (for camera to follow)
-                const observedFighter = GAME_STATE.fighters[fighterIndex];
-                if (observedFighter) {
-                    GAME_STATE.controlled = observedFighter;
-                    observedFighter.isControlled = false; // AI controlled, but camera follows
-
-                    document.getElementById('crowd').textContent =
-                        '🤖 WATCHING AI BATTLE: ' + observedFighter.name;
-                }
-            }
-
-            // Enable AI controller if any fighter has custom profile
-            const hasCustomProfiles = GAME_STATE.fighters.some(f =>
-                f.assignedProfile && f.assignedProfile !== '' && f.assignedProfile !== 'default'
-            );
-
-            if (hasCustomProfiles && window.aiController) {
-                window.aiController.enable();
-                console.log('🧠 Trained AI enabled for fighters with custom profiles');
-            }
-
-            // Start the game
-            document.getElementById('status-text').textContent = '🎬 ROUND 1: BEGIN!';
-            updateFighterList();
-            updateFighterCount();
-        }
-
-        function updateFighterList() {
+        window.updateFighterList = function() {
             const listContainer = document.getElementById('fighter-list');
             listContainer.innerHTML = '';
 
@@ -1412,13 +1489,14 @@
 
                         // Start backend episode when player takes control
                         if (window.backend && !GAME_STATE.episode_id) {
+                            const RING_SIZE = 160; // Match game config
                             const opponentIds = GAME_STATE.fighters
                                 .filter(f => f !== fighter && !f.eliminated)
                                 .map((_, i) => i + 2);
                             window.backend.startEpisode(1, opponentIds, RING_SIZE);
                         }
 
-                        updateFighterList();
+                        window.updateFighterList();
                         document.getElementById('crowd').textContent =
                             '🔥 ' + fighter.name + ' HAS ENTERED THE ARENA!';
                     });
@@ -1426,20 +1504,20 @@
 
                 listContainer.appendChild(item);
             });
-        }
+        };
 
-        function updateFighterCount() {
+        window.updateFighterCount = function() {
             const remaining = GAME_STATE.fighters.filter(f => !f.eliminated).length;
             document.getElementById('fighter-count').textContent = remaining;
 
             if (remaining === 1 && !GAME_STATE.victoryAnnounced) {
                 GAME_STATE.victoryAnnounced = true;
                 GAME_STATE.running = false;
-                announceVictory();
+                window.announceVictory();
             }
-        }
+        };
 
-        function announceVictory() {
+        window.announceVictory = function() {
             const champion = GAME_STATE.fighters.find(f => !f.eliminated);
             if (champion) {
                 document.getElementById('champion-name').textContent = champion.name;
@@ -1464,7 +1542,7 @@
                     }
                 }
             }
-        }
+        };
 
         // ==================== INPUT HANDLING ====================
         const controls = {
@@ -1587,8 +1665,8 @@
                 const message = crowdMessages[Math.floor(Math.random() * crowdMessages.length)];
                 document.getElementById('crowd').textContent = message;
 
-                updateFighterList();
-                updateFighterCount();
+                window.updateFighterList();
+                window.updateFighterCount();
             } else {
                 // Miss message
                 document.getElementById('crowd').textContent = '❌ ' + attacker.name + ' MISSED!';
@@ -1683,6 +1761,9 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
         }
+
+        // Start the game after all dependencies are loaded
+        waitForDependencies(startGame);
 
         // ==================== AI CONTROL ====================
         function toggleTrainedAI() {
