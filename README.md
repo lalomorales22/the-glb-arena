@@ -97,7 +97,26 @@ The system automatically learns fighting strategies: positioning, targeting, ris
 
 ## How to Run
 
-### Quick Start (Both Game & Training)
+### ⚡ Easiest Way: Auto-Start Script
+
+```bash
+# Just run the start script from the project root!
+cd /path/to/the-glb-arena
+chmod +x start.sh
+./start.sh
+```
+
+The script automatically:
+- ✅ Starts the Python backend (FastAPI) on port 8001
+- ✅ Starts the PHP frontend on port 8000
+- ✅ Handles cleanup when you press Ctrl+C
+- ✅ Shows colorful status messages
+
+**Then open:** http://localhost:8000 in your browser
+
+---
+
+### Quick Start (Both Game & Training - Manual)
 
 ```bash
 # Terminal 1: Start the game (PHP)
