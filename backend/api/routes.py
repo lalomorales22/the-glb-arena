@@ -349,7 +349,8 @@ def run_model_inference(fighter_id: int, data: dict, db: Session = Depends(get_d
 @router.post("/fighter-profiles", response_model=FighterProfileSchema, status_code=status.HTTP_201_CREATED)
 def create_fighter_profile(profile: FighterProfileCreateSchema, db: Session = Depends(get_db)):
     """Create a new personality profile for a fighter"""
-    # Verify fighter exists
+    # Verify fighter exists - return 404 for POST operations since
+    # creating a profile for a non-existent fighter is a user error
     fighter = db.query(Fighter).filter(Fighter.id == profile.fighter_id).first()
     if not fighter:
         raise HTTPException(status_code=404, detail="Fighter not found")
@@ -384,10 +385,11 @@ def create_fighter_profile(profile: FighterProfileCreateSchema, db: Session = De
 @router.get("/fighter-profiles/{fighter_id}", response_model=List[FighterProfileSchema])
 def get_fighter_profiles(fighter_id: int, db: Session = Depends(get_db)):
     """Get all personality profiles for a fighter"""
-    # Verify fighter exists
+    # Verify fighter exists - if not, return empty list instead of 404
+    # This allows fresh clones to work without pre-existing database entries
     fighter = db.query(Fighter).filter(Fighter.id == fighter_id).first()
     if not fighter:
-        raise HTTPException(status_code=404, detail="Fighter not found")
+        return []  # Return empty list for non-existent fighters
 
     profiles = db.query(FighterProfile).filter(
         FighterProfile.fighter_id == fighter_id
@@ -485,10 +487,11 @@ def get_training_job(job_id: int, db: Session = Depends(get_db)):
 @router.get("/training-jobs/fighter/{fighter_id}", response_model=List[TrainingJobSchema])
 def get_fighter_training_jobs(fighter_id: int, db: Session = Depends(get_db)):
     """Get all training jobs for a fighter"""
-    # Verify fighter exists
+    # Return empty list for non-existent fighters (consistent with get_fighter_profiles)
+    # This allows fresh clones to work without pre-existing database entries
     fighter = db.query(Fighter).filter(Fighter.id == fighter_id).first()
     if not fighter:
-        raise HTTPException(status_code=404, detail="Fighter not found")
+        return []  # Return empty list for non-existent fighters
 
     jobs = db.query(TrainingJob).filter(
         TrainingJob.fighter_id == fighter_id
